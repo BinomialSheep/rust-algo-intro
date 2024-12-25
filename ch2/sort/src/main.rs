@@ -1,3 +1,6 @@
+use rand::Rng;
+use std::time::Instant;
+
 // 挿入ソート
 fn insertion_sort(arr: &mut [i32]) {
     for i in 1..arr.len() {
@@ -61,7 +64,30 @@ fn merge_sort(arr: &mut [i32]) {
 }
 
 fn main() {
-    // ほよー
+    let mut rng = rand::thread_rng();
+    let mut total_insertion_duration = 0;
+    let mut total_merge_duration = 0;
+    let iterations = 5;
+
+    for _ in 0..iterations {
+        let mut numbers: Vec<i32> = (0..10000).map(|_| rng.gen_range(0..10000)).collect();
+        let mut numbers2 = numbers.clone();
+
+        // 挿入ソートの速度計測
+        let start = Instant::now();
+        insertion_sort(&mut numbers);
+        let duration = start.elapsed();
+        total_insertion_duration += duration.as_millis();
+
+        // マージソートの速度計測
+        let start = Instant::now();
+        merge_sort(&mut numbers2);
+        let duration = start.elapsed();
+        total_merge_duration += duration.as_millis();
+    }
+
+    println!("挿入ソートの平均実行時間: {} ms", total_insertion_duration / iterations);
+    println!("マージソートの平均実行時間: {} ms", total_merge_duration / iterations);
 }
 
 #[cfg(test)]
