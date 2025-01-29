@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::ops::Add;
+use std::ops::Sub;
 
 // 正方行列を二次元配列で表現する
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +83,24 @@ impl Add for SquareMatrix {
     }
 }
 
+impl Sub for SquareMatrix {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        assert_eq!(self.size, other.size);
+        let mut result = vec![vec![0; self.size]; self.size];
+        for i in 0..self.size {
+            for j in 0..self.size {
+                result[i][j] = self.data[i][j] - other.data[i][j];
+            }
+        }
+        Self {
+            size: self.size,
+            data: result,
+        }
+    }
+}
+
 // ランダム行列生成
 fn generate_random_matrix(size: usize, min: i32, max: i32) -> SquareMatrix {
     let mut rng = rand::thread_rng();
@@ -148,6 +167,55 @@ fn matrix_multiply_recursive(
     result.merge(&c11, &c12, &c21, &c22);
 }
 
+// StrassenのアルゴリズムΘ(N^log7)
+fn strassen(matrix_a: &SquareMatrix, matrix_b: &SquareMatrix, result: &mut SquareMatrix, n: usize) {
+    // 基底段階
+    if n == 1 {
+        result.data[0][0] += matrix_a.data[0][0] * matrix_b.data[0][0];
+        return;
+    }
+    // 分割
+    let (a11, a12, a21, a22) = matrix_a.split();
+    let (b11, b12, b21, b22) = matrix_b.split();
+
+    let half = n / 2;
+    // 統治
+    // 加算パート
+    let s1 = b12.clone() - b22.clone();
+    let s2 = a11.clone() + a12.clone();
+    let s3 = a21.clone() + a22.clone();
+    let s4 = b21.clone() - b11.clone();
+    let s5 = a11.clone() + a22.clone();
+    let s6 = b11.clone() + b22.clone();
+    let s7 = a12.clone() - a22.clone();
+    let s8 = b21.clone() + b22.clone();
+    let s9 = a11.clone() - a21.clone();
+    let s10 = b11.clone() + b12.clone();
+    // 乗算パート
+    let mut p1 = SquareMatrix::zero(half);
+    let mut p2 = SquareMatrix::zero(half);
+    let mut p3 = SquareMatrix::zero(half);
+    let mut p4 = SquareMatrix::zero(half);
+    let mut p5 = SquareMatrix::zero(half);
+    let mut p6 = SquareMatrix::zero(half);
+    let mut p7 = SquareMatrix::zero(half);
+    strassen(&a11, &s1, &mut p1, half);
+    strassen(&s2, &b22, &mut p2, half);
+    strassen(&s3, &b11, &mut p3, half);
+    strassen(&a22, &s4, &mut p4, half);
+    strassen(&s5, &s6, &mut p5, half);
+    strassen(&s7, &s8, &mut p6, half);
+    strassen(&s9, &s10, &mut p7, half);
+    // 加算パート
+    let c11 = p5.clone() + p4.clone() - p2.clone() + p6.clone();
+    let c12 = p1.clone() + p2.clone();
+    let c21 = p3.clone() + p4.clone();
+    let c22 = p5.clone() + p1.clone() - p3.clone() - p7.clone();
+
+    // 結合
+    result.merge(&c11, &c12, &c21, &c22);
+}
+
 fn main() {
     println!("Hello, world!");
 }
@@ -203,6 +271,37 @@ mod tests {
         let expected = naive_matrix_multiply(&matrix1, &matrix2);
         let mut recursive_result = SquareMatrix::zero(size);
         matrix_multiply_recursive(&matrix1, &matrix2, &mut recursive_result, size);
+
+        // 結果が一致することを確認
+        assert_eq!(
+            expected, recursive_result,
+            "Multiplication results do not match!"
+        );
+    }
+
+    #[test]
+    fn test_strassen() {
+        let matrix1 = SquareMatrix::new(2, vec![vec![1, 2], vec![3, 4]]);
+        let matrix2 = SquareMatrix::new(2, vec![vec![5, 6], vec![7, 8]]);
+        let expected = SquareMatrix::new(2, vec![vec![19, 22], vec![43, 50]]);
+
+        let mut result = SquareMatrix::zero(2);
+        strassen(&matrix1, &matrix2, &mut result, 2 as usize);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_random_strassen() {
+        let size = 16;
+
+        // ランダムな行列を生成
+        let matrix1 = generate_random_matrix(size, -10, 10);
+        let matrix2 = generate_random_matrix(size, -10, 10);
+
+        // 両方の方法で計算
+        let expected = naive_matrix_multiply(&matrix1, &matrix2);
+        let mut recursive_result = SquareMatrix::zero(size);
+        strassen(&matrix1, &matrix2, &mut recursive_result, size);
 
         // 結果が一致することを確認
         assert_eq!(
